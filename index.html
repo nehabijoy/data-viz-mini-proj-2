@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Town Story Map</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f7f7f7;
+      color: #222;
+    }
+
+    header {
+      padding: 24px;
+      background: white;
+      border-bottom: 1px solid #ddd;
+    }
+
+    h1 {
+      margin: 0 0 10px 0;
+    }
+
+    .container {
+      width: 90%;
+      max-width: 1200px;
+      margin: 24px auto;
+    }
+
+    .section {
+      background: white;
+      padding: 20px;
+      margin-bottom: 24px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+      border-radius: 8px;
+    }
+
+    svg {
+      width: 100%;
+      height: 450px;
+    }
+
+    .bar {
+      fill: steelblue;
+    }
+
+    .bar:hover {
+      fill: orange;
+    }
+
+    .axis-label {
+      font-size: 14px;
+    }
+
+    .legend-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #fafafa;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
+
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Spatial Story of the Towns</h1>
+    <p>
+      This project explores how cultural, commercial, and infrastructural spaces
+      are distributed across the towns.
+    </p>
+  </header>
+
+  <div class="container">
+    <div class="section">
+      <h2>Interactive Map</h2>
+      <p>
+        The map below shows where different activities and places are located.
+        Colors represent different categories such as restaurants, cultural
+        sites, retail, and buildings.
+      </p>
+
+      <iframe src="town_map.html"></iframe>
+    </div>
+
+    <div class="section">
+      <h2>Category Key</h2>
+      <p>
+        This legend makes the map colors easier to read at a glance.
+      </p>
+      <div id="legend" class="legend-grid"></div>
+    </div>
+
+    <div class="section">
+      <h2>D3 Summary Chart</h2>
+      <p>
+        This chart shows how many mapped places fall into each major category
+        across the dataset.
+      </p>
+      <svg id="chart" viewBox="0 0 900 450" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </div>
+
+  <script>
+    const categoryColors = {
+      "Restaurant": "#dc2626",
+      "Cultural / Church": "#2563eb",
+      "Retail": "#7c3aed",
+      "Building / Solar": "#16a34a",
+      "Other": "#6b7280"
+    };
+
+    function typeToCategory(type = "") {
+      const value = type.toLowerCase();
+
+      if (["restaurant", "cafe", "bar", "bakery", "food", "gelato"].some(word => value.includes(word))) {
+        return "Restaurant";
+      }
+
+      if (["church", "cultural", "museum", "statue", "fountain"].some(word => value.includes(word))) {
+        return "Cultural / Church";
+      }
+
+      if (["retail", "shop", "store", "market"].some(word => value.includes(word))) {
+        return "Retail";
+      }
+
+      if (["building", "solar"].some(word => value.includes(word))) {
+        return "Building / Solar";
+      }
+
+      return "Other";
+    }
+
+    const legendItems = Object.entries(categoryColors).map(([label, color]) => ({ label, color }));
+
+    d3.select("#legend")
+      .selectAll("div")
+      .data(legendItems)
+      .enter()
+      .append("div")
+      .attr("class", "legend-item")
+      .html(d => `<span class="swatch" style="background:${d.color}"></span><span>${d.label}</span>`);
+
+    const svg = d3.select("#chart");
+    const width = 900;
+    const height = 450;
+    const margin = { top: 20, right: 20, bottom: 90, left: 60 };
+
+    d3.csv("combined_data.csv").then(data => {
+      const counts = d3.rollups(
+        data,
+        values => values.length,
+        d => typeToCategory(d["Data Type"])
+      )
+        .map(([category, count]) => ({ category, count }))
+        .sort((a, b) => d3.descending(a.count, b.count));
+
+      const x = d3.scaleBand()
+        .domain(counts.map(d => d.category))
+        .range([margin.left, width - margin.right])
+        .padding(0.25);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(counts, d => d.count)])
+        .nice()
+        .range([height - margin.bottom, margin.top]);
+
+      svg.selectAll("*").remove();
+
+      svg.append("g")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x))
+        .selectAll("text")
+        .attr("transform", "rotate(-15)")
+        .style("text-anchor", "end");
+
+      svg.append("g")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y).ticks(6));
+
+      svg.selectAll(".bar")
+        .data(counts)
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("x", d => x(d.category))
+        .attr("y", d => y(d.count))
+        .attr("width", x.bandwidth())
+        .attr("height", d => y(0) - y(d.count))
+        .attr("fill", d => categoryColors[d.category] || "steelblue");
+
+      svg.selectAll(".label")
+        .data(counts)
+        .enter()
+        .append("text")
+        .attr("x", d => x(d.category) + x.bandwidth() / 2)
+        .attr("y", d => y(d.count) - 8)
+        .attr("text-anchor", "middle")
+        .style("font-size", "12px")
+        .text(d => d.count);
+    }).catch(error => {
+      console.error("CSV load failed:", error);
+      svg.append("text")
+        .attr("x", 20)
+        .attr("y", 40)
+        .text("Open this page with Live Server to load the D3 chart from the CSV file.");
+    });
+  </script>
+</body>
+</html>
