@@ -61,31 +61,6 @@
     .axis-label {
       font-size: 14px;
     }
-
-    .legend-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-      margin-top: 12px;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: #fafafa;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-    }
-
-    .swatch {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      display: inline-block;
-      flex-shrink: 0;
-    }
   </style>
 </head>
 <body>
@@ -108,130 +83,16 @@
 
       <iframe src="town_map.html"></iframe>
     </div>
-
+<!-- 
     <div class="section">
-      <h2>Category Key</h2>
+      <h2>Data Types by Town</h2>
       <p>
-        This legend makes the map colors easier to read at a glance.
+        This D3 chart supports the map by showing how many observations of each
+        type appear in each town.
       </p>
-      <div id="legend" class="legend-grid"></div>
+      <svg id="chart"></svg>
     </div>
+  </div> -->
 
-    <div class="section">
-      <h2>D3 Summary Chart</h2>
-      <p>
-        This chart shows how many mapped places fall into each major category
-        across the dataset.
-      </p>
-      <svg id="chart" viewBox="0 0 900 450" preserveAspectRatio="xMidYMid meet"></svg>
-    </div>
-  </div>
-
-  <script>
-    const categoryColors = {
-      "Restaurant": "#dc2626",
-      "Cultural / Church": "#2563eb",
-      "Retail": "#7c3aed",
-      "Building / Solar": "#16a34a",
-      "Other": "#6b7280"
-    };
-
-    function typeToCategory(type = "") {
-      const value = type.toLowerCase();
-
-      if (["restaurant", "cafe", "bar", "bakery", "food", "gelato"].some(word => value.includes(word))) {
-        return "Restaurant";
-      }
-
-      if (["church", "cultural", "museum", "statue", "fountain"].some(word => value.includes(word))) {
-        return "Cultural / Church";
-      }
-
-      if (["retail", "shop", "store", "market"].some(word => value.includes(word))) {
-        return "Retail";
-      }
-
-      if (["building", "solar"].some(word => value.includes(word))) {
-        return "Building / Solar";
-      }
-
-      return "Other";
-    }
-
-    const legendItems = Object.entries(categoryColors).map(([label, color]) => ({ label, color }));
-
-    d3.select("#legend")
-      .selectAll("div")
-      .data(legendItems)
-      .enter()
-      .append("div")
-      .attr("class", "legend-item")
-      .html(d => `<span class="swatch" style="background:${d.color}"></span><span>${d.label}</span>`);
-
-    const svg = d3.select("#chart");
-    const width = 900;
-    const height = 450;
-    const margin = { top: 20, right: 20, bottom: 90, left: 60 };
-
-    d3.csv("combined_data.csv").then(data => {
-      const counts = d3.rollups(
-        data,
-        values => values.length,
-        d => typeToCategory(d["Data Type"])
-      )
-        .map(([category, count]) => ({ category, count }))
-        .sort((a, b) => d3.descending(a.count, b.count));
-
-      const x = d3.scaleBand()
-        .domain(counts.map(d => d.category))
-        .range([margin.left, width - margin.right])
-        .padding(0.25);
-
-      const y = d3.scaleLinear()
-        .domain([0, d3.max(counts, d => d.count)])
-        .nice()
-        .range([height - margin.bottom, margin.top]);
-
-      svg.selectAll("*").remove();
-
-      svg.append("g")
-        .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(d3.axisBottom(x))
-        .selectAll("text")
-        .attr("transform", "rotate(-15)")
-        .style("text-anchor", "end");
-
-      svg.append("g")
-        .attr("transform", `translate(${margin.left},0)`)
-        .call(d3.axisLeft(y).ticks(6));
-
-      svg.selectAll(".bar")
-        .data(counts)
-        .enter()
-        .append("rect")
-        .attr("class", "bar")
-        .attr("x", d => x(d.category))
-        .attr("y", d => y(d.count))
-        .attr("width", x.bandwidth())
-        .attr("height", d => y(0) - y(d.count))
-        .attr("fill", d => categoryColors[d.category] || "steelblue");
-
-      svg.selectAll(".label")
-        .data(counts)
-        .enter()
-        .append("text")
-        .attr("x", d => x(d.category) + x.bandwidth() / 2)
-        .attr("y", d => y(d.count) - 8)
-        .attr("text-anchor", "middle")
-        .style("font-size", "12px")
-        .text(d => d.count);
-    }).catch(error => {
-      console.error("CSV load failed:", error);
-      svg.append("text")
-        .attr("x", 20)
-        .attr("y", 40)
-        .text("Open this page with Live Server to load the D3 chart from the CSV file.");
-    });
-  </script>
 </body>
 </html>
